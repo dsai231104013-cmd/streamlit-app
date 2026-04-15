@@ -6,31 +6,47 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 from io import BytesIO
 
-st.title("💎 COLOR VECTOR LOGO EXPORT (FINAL FIXED VERSION)")
+st.title("💎 COLOR VECTOR LOGO EXPORT (PRO FINAL VERSION)")
 
+# ✅ FINAL SUPPORTED FORMATS
 uploaded_files = st.file_uploader(
     "Upload Images",
-    type=["png", "jpg", "jpeg"],
+    type=["png", "jpg", "jpeg", "jfif", "webp"],
     accept_multiple_files=True
 )
 
+# ================= SAFE IMAGE LOADER =================
+def load_image(uploaded_file):
+    image = Image.open(uploaded_file)
+
+    # 💡 PRO TIP (SaaS LEVEL STABILITY)
+    # Always convert everything to RGB so pipeline never breaks
+    image = image.convert("RGB")
+
+    return image
+
+
 def preprocess(image):
 
-    img = np.array(image.convert("RGB"))
+    img = np.array(image)
 
+    # upscale for better vector quality
     img = cv2.resize(img, None, fx=2.0, fy=2.0, interpolation=cv2.INTER_CUBIC)
 
     gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
 
-    _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    _, thresh = cv2.threshold(
+        gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
+    )
 
     white_pixel = np.sum(thresh == 255)
     black_pixel = np.sum(thresh == 0)
 
+    # auto invert if needed
     if white_pixel > black_pixel:
         thresh = cv2.bitwise_not(thresh)
 
-    kernel = np.ones((3,3), np.uint8)
+    kernel = np.ones((3, 3), np.uint8)
     thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
 
     return img, thresh
@@ -72,8 +88,9 @@ def create_pdf(original_image, binary):
         if len(pixels) == 0:
             continue
 
+        # stable color extraction
         r, g, b = np.median(pixels, axis=0)
-        r, g, b = r/255, g/255, b/255
+        r, g, b = r / 255, g / 255, b / 255
 
         pts = contour.squeeze()
 
@@ -99,13 +116,16 @@ def create_pdf(original_image, binary):
     return buffer
 
 
+# ================= MAIN APP =================
+
 if uploaded_files:
 
     for idx, uploaded_file in enumerate(uploaded_files):
 
-        st.subheader(f"🖼 Processing {idx+1}")
+        st.subheader(f"🖼 Processing Image {idx + 1}")
 
-        image = Image.open(uploaded_file)
+        image = load_image(uploaded_file)
+
         st.image(image, use_container_width=True)
 
         original_img, binary = preprocess(image)
@@ -116,14 +136,14 @@ if uploaded_files:
 
         if pdf_buffer:
 
-            st.success("💎 PERFECT COLOR VECTOR PDF READY")
+            st.success("💎 VECTOR PDF GENERATED SUCCESSFULLY")
 
             st.download_button(
-                f"⬇ Download PDF {idx+1}",
+                f"⬇ Download Vector PDF {idx + 1}",
                 pdf_buffer,
-                file_name=f"vector_{idx+1}.pdf",
+                file_name=f"vector_logo_{idx + 1}.pdf",
                 mime="application/pdf"
             )
 
         else:
-            st.error("No object detected")
+            st.error("No object detected in image")
